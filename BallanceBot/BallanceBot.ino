@@ -7,53 +7,58 @@
 
 
 // the setup function runs once when you press reset or power the board
-#include <MPU6050_6Axis_MotionApps20.h>
-#include <MPU6050.h>
-
-#define OUTPUT_READABLE_YAWPITCHROLL
+#include <PID/PID_v1.h>
+#include <TaskScheduler/src/TaskScheduler.h>
+						
 
 // mpu control/status vars
-bool		dmpReady		= false;
-uint8_t		mpuIntStatus;
-uint8_t		devStatus;
-uint16_t	packetSize;
+#define	KP		250
+#define	KI		20
+#define	KD		0
 
-volatile bool mpuInterrupt = false;
+double	SetPoint	= 90;
+double	pitch		= 90;
+double	input		= 0;
 
-MPU6050	mpu;
+PID			pid(&pitch, &input, &SetPoint, KP, KI, KD, REVERSE);
+Scheduler	scheduler;
+
+Task		ballanceBotTask(50, -1, loopBallanceBot);
 
 void setup() {
 	Serial.begin(115200);
 
-	Serial.println(F("Initializing I2C devices..."));
-	mpu.initialize();
+	initGyro();
+	initMotors();
 
-	Serial.println(F("Testing device connections..."));
-	Serial.println(mpu.testConnection() ? F("MPU6050 connection successful.") : F("MPU6050 connection fail."));
+	pid.SetMode(AUTOMATIC);
+	pid.SetSampleTime(50);
+	pid.SetOutputLimits(-255., 255.);
 
-	devStatus = mpu.dmpInitialize();
+	Serial.println("Enable Ballance Bot Task...");
+	ballanceBotTask.enable();
 
-	if (devStatus == 0) {
-		Serial.println(F("Enabling DMP..."));
-		mpu.setDMPEnabled(true);
-
-		// enable Arduino interrupt detection
-		Serial.println(F("DMP ready! Waiting for first interrupt..."));
-		dmpReady = true;
-
-		packetSize = mpu.dmpGetFIFOPacketSize();
-	}
-	else {
-		Serial.print(F("DMP Initialization failed (code "));
-		Serial.print(devStatus);
-		Serial.println(F(")"));
-	}
+	Serial.println("Initialize Scheduler...");
+	scheduler.init();
+	
+	Serial.println("Add Ballance Bot Task.");
+	scheduler.addTask(ballanceBotTask);
 }
 
 // the loop function runs over and over again until power down or reset
 void loop() {
-	if (!dmpReady)
-		return;
+	scheduler.execute();
+	pid.Compute();
 
-	while(!mpuIn)
+	readGyroData();
+}
+
+//do this loop 10ms/time
+void loopBallanceBot() {
+	pitch = getPitch();
+
+	Serial.print("Input Value: ");
+	Serial.println(input);
+
+	go(input > 0 ? 0 : 1, abs(input));
 }

@@ -16,6 +16,8 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="BallanceBot.ino" />
+    <None Include="Motors.ino" />
+    <None Include="Gyro.ino" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="__vm\.BallanceBot.vsarduino.h">
